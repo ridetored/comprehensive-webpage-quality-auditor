@@ -15,7 +15,7 @@ def count_words(content):
     return len(words), set(words)
 
 # Function to check image alt attributes, content relevance, and calculate a score
-def check_page_quality(url):
+def check_page_quality(url, content_threshold=300, alt_threshold=80, relevance_threshold=70):
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()  # Check if the request was successful
@@ -69,6 +69,20 @@ def check_page_quality(url):
         # Final score is the average of the alt score, relevance score, and content relevance
         final_score = (alt_score + relevance_score + content_relevance_score) / 3
 
+        # Highlighting areas for improvement
+        improvement_areas = []
+        if word_count < content_threshold:
+            improvement_areas.append("Increase content word count.")
+        if alt_score < alt_threshold:
+            improvement_areas.append("Add alt text to more images.")
+        if relevance_score < relevance_threshold:
+            improvement_areas.append("Improve the relevance of image alt text.")
+        if content_relevance_score < relevance_threshold:
+            improvement_areas.append("Increase content relevance by including more target keywords.")
+
+        # Combine suggestions for output
+        suggestions = " | ".join(improvement_areas) if improvement_areas else "No major issues detected."
+
         return {
             "URL": url,
             "Score": round(final_score, 2),
@@ -76,11 +90,22 @@ def check_page_quality(url):
             "Images Without Alt": images_without_alt if images else 0,
             "Alt Relevance Score": round(relevance_score, 2),
             "Content Word Count": word_count,
-            "Content Relevance Score": round(content_relevance_score, 2)
+            "Content Relevance Score": round(content_relevance_score, 2),
+            "Suggestions": suggestions
         }
 
     except requests.exceptions.RequestException as e:
-        return {"URL": url, "Score": "Error", "Total Images": "N/A", "Images Without Alt": "N/A", "Alt Relevance Score": "Error", "Content Word Count": "N/A", "Content Relevance Score": "Error", "Error": str(e)}
+        return {
+            "URL": url, 
+            "Score": "Error", 
+            "Total Images": "N/A", 
+            "Images Without Alt": "N/A", 
+            "Alt Relevance Score": "Error", 
+            "Content Word Count": "N/A", 
+            "Content Relevance Score": "Error", 
+            "Suggestions": "Error retrieving the page.", 
+            "Error": str(e)
+        }
 
 # Function to read URLs from a CSV file, check their content, image alt attributes, and write results to another CSV file
 def check_urls_from_csv(input_csv, output_csv, max_workers=10):
@@ -102,7 +127,7 @@ def check_urls_from_csv(input_csv, output_csv, max_workers=10):
 
     # Write the results to a new CSV file
     with open(output_csv, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=["URL", "Score", "Total Images", "Images Without Alt", "Alt Relevance Score", "Content Word Count", "Content Relevance Score"])
+        writer = csv.DictWriter(file, fieldnames=["URL", "Score", "Total Images", "Images Without Alt", "Alt Relevance Score", "Content Word Count", "Content Relevance Score", "Suggestions"])
         writer.writeheader()
 
         # Write each result to the CSV file
